@@ -1,0 +1,13 @@
+# Ignore virtual environments
+venv/
+__pycache__/
+
+# Ignore API keys
+.env
+
+# Ignore token usage logs
+token_usage.log
+
+# Ignore temporary chat logs if you want
+chats/*.txt
+chats/*.md
