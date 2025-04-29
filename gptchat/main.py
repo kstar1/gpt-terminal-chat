@@ -8,9 +8,16 @@ import shutil
 import glob
 import datetime
 
+from rich.console import Console
+from rich.prompt import Prompt
+from rich.panel import Panel
+from rich import print as rprint
+
 # Load the API key from .env
 load_dotenv()
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+console = Console()
 
 # === Helper Functions ===
 
@@ -47,7 +54,7 @@ def auto_summarize_chat(messages, model="gpt-4o"):
         )
         return response.choices[0].message.content
     except Exception as e:
-        print(f"⚠️ Could not generate summary: {e}")
+        rprint(f"[bold red]⚠️ Could not generate summary: {e}[/bold red]")
         return None
 
 def auto_generate_title(messages, model="gpt-4o"):
@@ -65,7 +72,7 @@ def auto_generate_title(messages, model="gpt-4o"):
         )
         return response.choices[0].message.content.strip().replace(" ", "_")
     except Exception as e:
-        print(f"⚠️ Could not generate title: {e}")
+        rprint(f"[bold red]⚠️ Could not generate title: {e}[/bold red]")
         return f"chat_{time.strftime('%Y%m%d-%H%M%S')}"
 
 def load_history_from_file(file_path):
@@ -89,32 +96,32 @@ def get_timestamp():
 # === Main Function ===
 
 def main():
-    print("🌟 Welcome to your GPT Terminal Chat 🌟")
+    console.rule("[bold magenta]🌟 GPT Terminal Chat 🌟", style="cyan")
 
     # Markdown Output Toggle
-    markdown_choice = input("Do you want Markdown output for VS Code? (y/n): ").lower()
+    markdown_choice = Prompt.ask("Do you want [cyan]Markdown output[/cyan] for VS Code?", choices=["y", "n"])
     markdown_output = markdown_choice == "y"
 
     # Load Previous Chat History
     messages = []
-    history_choice = input("Do you want to load previous chats? (y/n): ").lower()
+    history_choice = Prompt.ask("Do you want to [green]load previous chats[/green]?", choices=["y", "n"])
     if history_choice == "y":
         files = glob.glob("chats/chat_*.md") + glob.glob("chats/chat_*.txt")
         if files:
-            print("\nAvailable chat files:")
+            rprint("\n[bold yellow]Available chat files:[/bold yellow]")
             for idx, file in enumerate(files):
-                print(f"{idx+1}. {file}")
+                rprint(f"[green]{idx+1}.[/green] {file}")
 
-            file_indexes = input("\nEnter file numbers to load, separated by commas (e.g., 1,3): ").split(",")
+            file_indexes = Prompt.ask("\nEnter file numbers to load (e.g., 1,3)").split(",")
             for idx in file_indexes:
                 idx = int(idx.strip()) - 1
                 messages += load_history_from_file(files[idx])
-            print(f"✅ Loaded {len(file_indexes)} chat(s) into current session.")
+            rprint(f"[bold green]✅ Loaded {len(file_indexes)} chat(s) into current session.[/bold green]")
         else:
-            print("⚠️ No chat logs found. Starting fresh.")
+            rprint("[bold red]⚠️ No chat logs found. Starting fresh.[/bold red]")
 
     # Model Selection
-    model = input("\nWhich model do you want to use? (default gpt-4o): ") or "gpt-4o"
+    model = Prompt.ask("Which [yellow]model[/yellow] do you want to use?", default="gpt-4o")
 
     chat_log = ""
     timestamp_now = time.strftime("%Y%m%d-%H%M%S")
@@ -122,13 +129,13 @@ def main():
     os.makedirs("chats", exist_ok=True)
 
     while True:
-        user_input = input("\nYou: ")
+        user_input = Prompt.ask("[bold cyan]You[/bold cyan]")
         if user_input.lower() in {"exit", "quit"}:
-            print("\n👋 Exiting chat...")
+            rprint("\n[bold red]👋 Exiting chat...[/bold red]")
             break
 
         messages.append({"role": "user", "content": user_input})
-        print("\nAssistant: ", end="", flush=True)
+        rprint("\n[bold green]Assistant:[/bold green] ", end="")
 
         # Stream the assistant response
         stream_response = chat_with_gpt(messages, model=model, stream=True)
@@ -137,8 +144,11 @@ def main():
         for chunk in stream_response:
             if chunk.choices[0].delta.content:
                 chunk_text = chunk.choices[0].delta.content
-                print(chunk_text, end="", flush=True)
+                console.print(chunk_text, end="", highlight=False, soft_wrap=True)
                 full_response += chunk_text
+
+        # Display assistant response inside a panel
+        console.print(Panel(full_response, title="Assistant", title_align="left", style="bold green"))
 
         if markdown_output:
             formatted_response = f"\n\n```\n{full_response}\n```\n"
@@ -154,11 +164,11 @@ def main():
         log_token_usage(model, total_tokens)
 
     # After exiting chat
-    should_save = input("\n📝 Do you want to save this chat? (y/n): ").lower()
+    should_save = Prompt.ask("\n📝 Do you want to [cyan]save this chat[/cyan]?", choices=["y", "n"])
 
     if should_save == "y":
         # Auto-generate a title
-        print("\n🔖 Generating an apt chat title...")
+        rprint("\n[bold cyan]🔖 Generating an apt chat title...[/bold cyan]")
         apt_name = auto_generate_title(messages, model=model)
         extension = "md" if markdown_output else "txt"
         final_log_filename = f"chats/chat_{apt_name}_{timestamp_now}.{extension}"
@@ -167,21 +177,20 @@ def main():
         save_chat_log(chat_log, filename=temp_log_filename)
 
         # Summarize and append
-        print("\n🧹 Summarizing the chat...")
+        rprint("\n[bold yellow]🧹 Summarizing the chat...[/bold yellow]")
         summary = auto_summarize_chat(messages, model=model)
         if summary:
             with open(temp_log_filename, "a", encoding="utf-8") as f:
                 f.write("\n\n--- Chat Summary ---\n")
                 f.write(summary)
 
-        # Move final file
         shutil.move(temp_log_filename, final_log_filename)
-        print(f"✅ Chat saved as {final_log_filename}")
+        rprint(f"[bold green]✅ Chat saved as {final_log_filename}[/bold green]")
 
     else:
         if os.path.exists(temp_log_filename):
             os.remove(temp_log_filename)
-        print("🗑️ Chat discarded. Nothing saved.")
+        rprint("[bold red]🗑️ Chat discarded. Nothing saved.[/bold red]")
 
 # === CLI Entry Point ===
 

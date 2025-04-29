@@ -1,0 +1,2 @@
+[console_scripts]
+gptchat = gptchat.main:main

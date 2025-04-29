@@ -1,0 +1,12 @@
+LICENSE
+README.md
+pyproject.toml
+setup.py
+gptchat/__init__.py
+gptchat/main.py
+gptchat.egg-info/PKG-INFO
+gptchat.egg-info/SOURCES.txt
+gptchat.egg-info/dependency_links.txt
+gptchat.egg-info/entry_points.txt
+gptchat.egg-info/requires.txt
+gptchat.egg-info/top_level.txt
