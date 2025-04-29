@@ -1,5 +1,6 @@
 # Ignore virtual environments
 venv/
+myenv/
 __pycache__/
 
 # Ignore API keys
